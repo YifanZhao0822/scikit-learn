@@ -778,7 +778,7 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
             min_impurity_split=min_impurity_split,
             presort=presort)
 
-    def fit(self, X, y, sample_weight=None, check_input=True,
+    def fit(self, X, y, costs, coe, sample_weight=None, check_input=True,
             X_idx_sorted=None):
         """Build a decision tree classifier from the training set (X, y).
 
@@ -815,7 +815,7 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
         """
 
         super().fit(
-            X, y,
+            X, y, costs=costs, coe=coe,
             sample_weight=sample_weight,
             check_input=check_input,
             X_idx_sorted=X_idx_sorted)
@@ -1120,7 +1120,7 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
             min_impurity_split=min_impurity_split,
             presort=presort)
 
-    def fit(self, X, y, sample_weight=None, check_input=True,
+    def fit(self, X, y, costs, coe, sample_weight=None, check_input=True,
             X_idx_sorted=None):
         """Build a decision tree regressor from the training set (X, y).
 
@@ -1156,7 +1156,7 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
         """
 
         super().fit(
-            X, y,
+            X, y, costs=costs, coe=coe,
             sample_weight=sample_weight,
             check_input=check_input,
             X_idx_sorted=X_idx_sorted)
