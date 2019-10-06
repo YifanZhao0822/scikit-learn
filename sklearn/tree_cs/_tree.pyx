@@ -90,7 +90,7 @@ NODE_DTYPE = np.dtype({
 cdef class TreeBuilder:
     """Interface for different tree building strategies."""
 
-    cpdef build(self, Tree tree, object X, np.ndarray y, SIZE_t max_cost,
+    cpdef build(self, Tree tree, object X, np.ndarray y, #SIZE_t max_cost,
                 np.ndarray sample_weight=None,
                 np.ndarray X_idx_sorted=None):
         """Build a decision tree from the training set (X, y)."""
@@ -361,7 +361,7 @@ cdef class BestFirstTreeBuilder(TreeBuilder):
             # add root to frontier
             rc = self._add_split_node(splitter, tree, 0, n_node_samples,
                                       INFINITY, IS_FIRST, IS_LEFT, NULL, 0,
-                                      &split_node_left, &cost_so_far)
+                                      &split_node_left, &cost_so_far, max_cost)
             if rc >= 0:
                 rc = _add_to_frontier(&split_node_left, frontier)
 
@@ -394,7 +394,7 @@ cdef class BestFirstTreeBuilder(TreeBuilder):
                                               record.impurity_left,
                                               IS_NOT_FIRST, IS_LEFT, node,
                                               record.depth + 1,
-                                              &split_node_left, &cost_so_far)
+                                              &split_node_left, &cost_so_far, max_cost)
                     if rc == -1:
                         break
 
@@ -407,7 +407,7 @@ cdef class BestFirstTreeBuilder(TreeBuilder):
                                               record.impurity_right,
                                               IS_NOT_FIRST, IS_NOT_LEFT, node,
                                               record.depth + 1,
-                                              &split_node_right, &cost_so_far)
+                                              &split_node_right, &cost_so_far, max_cost)
                     if rc == -1:
                         break
 

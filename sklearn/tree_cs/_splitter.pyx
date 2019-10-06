@@ -258,7 +258,6 @@ cdef class BaseDenseSplitter(Splitter):
         self.sample_mask = NULL
         self.presort = presort
         self.costs = costs
-        self.max_cost = max_cost
         self.coe = coe
 
     def __dealloc__(self):
@@ -300,7 +299,6 @@ cdef class BestSplitter(BaseDenseSplitter):
     def __reduce__(self):
         return (BestSplitter, (self.criterion,
                                self.costs,
-                               self.max_cost,
                                self.coe,
                                self.max_features,
                                self.min_samples_leaf,
