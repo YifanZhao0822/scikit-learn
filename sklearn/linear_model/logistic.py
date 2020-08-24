@@ -78,7 +78,7 @@ def _intercept_dot(w, X, y):
     return w, c, yz
 
 
-def _logistic_loss_and_grad(w, X, y, alpha, sample_weight=None):
+def _logistic_loss_and_grad(w, X, y, alpha, sample_weight=None, preference=None):
     """Computes the logistic loss and gradient.
 
     Parameters
@@ -115,8 +115,19 @@ def _logistic_loss_and_grad(w, X, y, alpha, sample_weight=None):
     if sample_weight is None:
         sample_weight = np.ones(n_samples)
 
+    print(preference)
+
+    if preference == {'Lambda': 0, 'preference': None}:
+        prefer_regu = 0
+    else:
+        preferred_w = np.multiply(preference['preference'], w)
+        prefer_regu = preference['Lambda'] * np.dot(preferred_w, preferred_w)# == preferred_w**2
+
+
+    print(prefer_regu)
+
     # Logistic loss is the negative of the log of the logistic function.
-    out = -np.sum(sample_weight * log_logistic(yz)) + .5 * alpha * np.dot(w, w)
+    out = -np.sum(sample_weight * log_logistic(yz)) + .5 * alpha * np.dot(w, w) + prefer_regu
 
     z = expit(yz)
     z0 = sample_weight * (z - 1) * y
@@ -129,7 +140,7 @@ def _logistic_loss_and_grad(w, X, y, alpha, sample_weight=None):
     return out, grad
 
 
-def _logistic_loss(w, X, y, alpha, sample_weight=None):
+def _logistic_loss(w, X, y, alpha, sample_weight=None, preference=None):
     """Computes the logistic loss.
 
     Parameters
@@ -160,12 +171,19 @@ def _logistic_loss(w, X, y, alpha, sample_weight=None):
     if sample_weight is None:
         sample_weight = np.ones(y.shape[0])
 
+    if preference == {'Lambda': 0, 'preference': None}:
+        prefer_regu = 0
+    else:
+        preferred_w = np.multiply(preference['preference'], w)
+        prefer_regu = preference['Lambda'] * np.dot(preferred_w, preferred_w)
+
     # Logistic loss is the negative of the log of the logistic function.
-    out = -np.sum(sample_weight * log_logistic(yz)) + .5 * alpha * np.dot(w, w)
+    out = -np.sum(sample_weight * log_logistic(yz)) + .5 * alpha * np.dot(w, w) + prefer_regu
+    # print("Here is the loss function")
     return out
 
 
-def _logistic_grad_hess(w, X, y, alpha, sample_weight=None):
+def _logistic_grad_hess(w, X, y, alpha, sample_weight=None, Lambda=0, preference=None):
     """Computes the gradient and the Hessian, in the case of a logistic loss.
 
     Parameters
@@ -650,7 +668,7 @@ def _logistic_regression_path(X, y, pos_class=None, Cs=10, fit_intercept=True,
                               intercept_scaling=1., multi_class='auto',
                               random_state=None, check_input=True,
                               max_squared_sum=None, sample_weight=None,
-                              l1_ratio=None):
+                              l1_ratio=None, **kwargs):
     """Compute a Logistic Regression model for a list of regularization
     parameters.
 
@@ -926,13 +944,13 @@ def _logistic_regression_path(X, y, pos_class=None, Cs=10, fit_intercept=True,
                 np.searchsorted(np.array([0, 1, 2, 3]), verbose)]
             opt_res = optimize.minimize(
                 func, w0, method="L-BFGS-B", jac=True,
-                args=(X, target, 1. / C, sample_weight),
+                args=(X, target, 1. / C, sample_weight, kwargs),
                 options={"iprint": iprint, "gtol": tol, "maxiter": max_iter}
             )
             n_iter_i = _check_optimize_result(solver, opt_res, max_iter)
             w0, loss = opt_res.x, opt_res.fun
         elif solver == 'newton-cg':
-            args = (X, target, 1. / C, sample_weight)
+            args = (X, target, 1. / C, sample_weight, kwargs)
             w0, n_iter_i = _newton_cg(hess, func, grad, w0, args=args,
                                       maxiter=max_iter, tol=tol)
         elif solver == 'liblinear':
@@ -1428,7 +1446,7 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
                  fit_intercept=True, intercept_scaling=1, class_weight=None,
                  random_state=None, solver='lbfgs', max_iter=100,
                  multi_class='auto', verbose=0, warm_start=False, n_jobs=None,
-                 l1_ratio=None):
+                 l1_ratio=None, Lambda=0, preference=None):
 
         self.penalty = penalty
         self.dual = dual
@@ -1445,6 +1463,8 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
         self.warm_start = warm_start
         self.n_jobs = n_jobs
         self.l1_ratio = l1_ratio
+        self.Lambda = Lambda
+        self.preference = preference
 
     def fit(self, X, y, sample_weight=None):
         """Fit the model according to the given training data.
@@ -1585,7 +1605,7 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
                       class_weight=self.class_weight, check_input=False,
                       random_state=self.random_state, coef=warm_start_coef_,
                       penalty=penalty, max_squared_sum=max_squared_sum,
-                      sample_weight=sample_weight)
+                      sample_weight=sample_weight, Lambda=self.Lambda, preference=self.preference)
             for class_, warm_start_coef_ in zip(classes_, warm_start_coef))
 
         fold_coefs_, _, n_iter_ = zip(*fold_coefs_)
@@ -2150,6 +2170,7 @@ class LogisticRegressionCV(LogisticRegression, BaseEstimator,
 
                 # Note that y is label encoded and hence pos_class must be
                 # the encoded label / None (for 'multinomial')
+                # TODO: add user preference args here
                 w, _, _ = _logistic_regression_path(
                     X, y, pos_class=encoded_label, Cs=[C_], solver=solver,
                     fit_intercept=self.fit_intercept, coef=coef_init,
