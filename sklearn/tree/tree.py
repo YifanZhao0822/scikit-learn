@@ -95,7 +95,9 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
                  min_impurity_split,
                  class_weight=None,
                  presort='deprecated',
-                 ccp_alpha=0.0):
+                 ccp_alpha=0.0,
+                 preference=None,
+                 lambda_=None):
         self.criterion = criterion
         self.splitter = splitter
         self.max_depth = max_depth
@@ -110,6 +112,8 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
         self.class_weight = class_weight
         self.presort = presort
         self.ccp_alpha = ccp_alpha
+        self.preference = preference
+        self.lambda_ = lambda_
 
     def get_depth(self):
         """Returns the depth of the decision tree.
@@ -335,7 +339,9 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
                                                 self.max_features_,
                                                 min_samples_leaf,
                                                 min_weight_leaf,
-                                                random_state)
+                                                random_state,
+                                                self.preference,
+                                                self.lambda_)
 
         if is_classifier(self):
             self.tree_ = Tree(self.n_features_,
@@ -814,7 +820,9 @@ class DecisionTreeClassifier(ClassifierMixin, BaseDecisionTree):
                  min_impurity_split=None,
                  class_weight=None,
                  presort='deprecated',
-                 ccp_alpha=0.0):
+                 ccp_alpha=0.0,
+                 preference=None,
+                 lambda_=None):
         super().__init__(
             criterion=criterion,
             splitter=splitter,
@@ -829,7 +837,9 @@ class DecisionTreeClassifier(ClassifierMixin, BaseDecisionTree):
             min_impurity_decrease=min_impurity_decrease,
             min_impurity_split=min_impurity_split,
             presort=presort,
-            ccp_alpha=ccp_alpha)
+            ccp_alpha=ccp_alpha,
+            preference=preference,
+            lambda_=lambda_)
 
     def fit(self, X, y, sample_weight=None, check_input=True,
             X_idx_sorted=None):
