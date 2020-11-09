@@ -115,16 +115,17 @@ def _logistic_loss_and_grad(w, X, y, alpha, sample_weight=None, preference=None)
     if sample_weight is None:
         sample_weight = np.ones(n_samples)
 
-    print(preference)
+    # print(preference)
 
-    if preference == {'Lambda': 0, 'preference': None}:
-        prefer_regu = 0
-    else:
+    if preference['Lambda'] != 0:
         preferred_w = np.multiply(preference['preference'], w)
-        prefer_regu = preference['Lambda'] * np.dot(preferred_w, preferred_w)# == preferred_w**2
+        prefer_regu = preference['Lambda'] * np.dot(preferred_w, preferred_w)
+    else:
+        prefer_regu = 0
 
+    prefer_regu *= np.sum(sample_weight * log_logistic(yz)) / np.dot(w, w)
 
-    print(prefer_regu)
+    # print(prefer_regu)
 
     # Logistic loss is the negative of the log of the logistic function.
     out = -np.sum(sample_weight * log_logistic(yz)) + .5 * alpha * np.dot(w, w) + prefer_regu
@@ -171,11 +172,11 @@ def _logistic_loss(w, X, y, alpha, sample_weight=None, preference=None):
     if sample_weight is None:
         sample_weight = np.ones(y.shape[0])
 
-    if preference == {'Lambda': 0, 'preference': None}:
-        prefer_regu = 0
-    else:
+    if preference['Lambda'] != 0:
         preferred_w = np.multiply(preference['preference'], w)
         prefer_regu = preference['Lambda'] * np.dot(preferred_w, preferred_w)
+    else:
+        prefer_regu = 0
 
     # Logistic loss is the negative of the log of the logistic function.
     out = -np.sum(sample_weight * log_logistic(yz)) + .5 * alpha * np.dot(w, w) + prefer_regu
