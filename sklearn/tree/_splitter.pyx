@@ -34,6 +34,9 @@ from ._utils cimport rand_uniform
 from ._utils cimport RAND_R_MAX
 from ._utils cimport safe_realloc
 
+from libc.stdlib cimport malloc, free
+from libc.stdio cimport printf
+
 cdef double INFINITY = np.inf
 
 # Mitigate precision differences between 32 bit and 64 bit
@@ -60,7 +63,7 @@ cdef class Splitter:
 
     def __cinit__(self, Criterion criterion, SIZE_t max_features,
                   SIZE_t min_samples_leaf, double min_weight_leaf,
-                  object random_state):
+                  object random_state, np.ndarray preference, DOUBLE_t lambda_):
         """
         Parameters
         ----------
@@ -99,6 +102,14 @@ cdef class Splitter:
         self.min_weight_leaf = min_weight_leaf
         self.random_state = random_state
 
+        # print(f"{len(preference)}")
+        self.preference = <DOUBLE_t *>malloc(len(preference) * sizeof(DOUBLE_t))
+        for i, x in enumerate(preference):
+            self.preference[i] = x
+            # print(self.preference[i], end=",")
+        self.lambda_ = lambda_
+        # print(f"lambda_={self.lambda_}")
+
     def __dealloc__(self):
         """Destructor."""
 
@@ -106,6 +117,7 @@ cdef class Splitter:
         free(self.features)
         free(self.constant_features)
         free(self.feature_values)
+        free(self.preference)
 
     def __getstate__(self):
         return {}
@@ -248,7 +260,7 @@ cdef class BaseDenseSplitter(Splitter):
 
     def __cinit__(self, Criterion criterion, SIZE_t max_features,
                   SIZE_t min_samples_leaf, double min_weight_leaf,
-                  object random_state):
+                  object random_state, np.ndarray preference, DOUBLE_t lambda_):
 
         self.X_idx_sorted_ptr = NULL
         self.X_idx_sorted_stride = 0
@@ -328,6 +340,8 @@ cdef class BestSplitter(BaseDenseSplitter):
         cdef SIZE_t n_total_constants = n_known_constants
         cdef DTYPE_t current_feature_value
         cdef SIZE_t partition_end
+
+        cdef DOUBLE_t loss
 
         _init_split(&best, end)
 
@@ -424,7 +438,9 @@ cdef class BestSplitter(BaseDenseSplitter):
                                     (self.criterion.weighted_n_right < min_weight_leaf)):
                                 continue
 
-                            current_proxy_improvement = self.criterion.proxy_impurity_improvement()
+                            loss = self.lambda_ * self.preference[current.feature]
+                            # printf("loss=%f\n", loss)
+                            current_proxy_improvement = self.criterion.proxy_impurity_improvement() - loss
 
                             if current_proxy_improvement > best_proxy_improvement:
                                 best_proxy_improvement = current_proxy_improvement
