@@ -103,11 +103,8 @@ cdef class Splitter:
         self.random_state = random_state
 
         self.preference = safe_realloc(&self.preference, len(preference) * sizeof(DOUBLE_t))
-        printf("Costs: ")
         for i, x in enumerate(preference):
             self.preference[i] = x
-            printf("%.2f ", self.preference[i])
-        printf("\n")
 
         self.lambda_ = lambda_
         self.C_max = C_max
@@ -306,17 +303,9 @@ cdef class BestSplitter(BaseDenseSplitter):
     cdef double sum_of_cost(self) nogil except -1:
         cdef double sum_ = 0
         for i in range(self.n_features):
-            # printf("%d, cost=%.2f; ", self.used_features[i], self.preference[i])
-            sum_ += self.preference[i] if self.used_features[i] == 1 else 0
-        # printf("\nsum of costs=%.2f\n\n", costs_sum)
+            # sum_ += self.preference[i] if self.used_features[i] == 1 else 0
+            sum_ += 1 if self.used_features[i] == 1 else 0
         return sum_
-
-
-    cdef long show_used_features(self) nogil except -1:
-        printf("Used features: ")
-        for i in range(self.n_features):
-            printf("%d", self.used_features[i])
-        printf("\n\n")
 
 
     cdef int node_split(self, double impurity, SplitRecord* split,
@@ -402,14 +391,12 @@ cdef class BestSplitter(BaseDenseSplitter):
             #   and aren't constant.
 
             sum_of_costs_= self.sum_of_cost()
-            printf("Sum of costs = %f\n", sum_of_costs_)
+            printf("sum of cost = %f, C_max = %f\n", sum_of_costs_, self.C_max)
             if sum_of_costs_ < self.C_max:
-                printf("Choose freely; range[%d, %d)\n", n_drawn_constants, f_i - n_found_constants)
                 # Draw a feature at random
                 f_j = rand_int(n_drawn_constants, f_i - n_found_constants,
                                random_state)
             else:
-                printf("Choose limited to used features; range[%d, %d)\n", n_drawn_constants, f_i - n_found_constants)
                 n_candidate_features = 0
                 for i in range(n_drawn_constants, f_i - n_found_constants):
                     # Only use used feature
@@ -484,10 +471,8 @@ cdef class BestSplitter(BaseDenseSplitter):
 
                             loss = self.lambda_ * self.preference[current.feature]
                             current_proxy_improvement = self.criterion.proxy_impurity_improvement() - loss
-                            # printf("feature idx=%d, loss=%f, impurity_improvement=%f\n", current.feature, loss, current_proxy_improvement)
 
-                            if current_proxy_improvement > best_proxy_improvement \
-                                    and self.preference[current.feature] + sum_of_costs_ <= self.C_max:
+                            if current_proxy_improvement > best_proxy_improvement:
                                 best_proxy_improvement = current_proxy_improvement
                                 # sum of halves is used to avoid infinite value
                                 current.threshold = Xf[p - 1] / 2.0 + Xf[p] / 2.0
@@ -499,9 +484,7 @@ cdef class BestSplitter(BaseDenseSplitter):
 
                                 best = current  # copy
 
-        printf("Best feature = %d, impurity improvement = %f\n", best.feature, best_proxy_improvement)
         self.used_features[best.feature] = 1
-        self.show_used_features()
 
         # Reorganize into samples[start:best.pos] + samples[best.pos:end]
         if best.pos < end:
