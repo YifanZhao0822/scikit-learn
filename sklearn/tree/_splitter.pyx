@@ -63,7 +63,7 @@ cdef class Splitter:
 
     def __cinit__(self, Criterion criterion, SIZE_t max_features,
                   SIZE_t min_samples_leaf, double min_weight_leaf,
-                  object random_state, np.ndarray preference, DOUBLE_t lambda_):
+                  object random_state, np.ndarray preference, DOUBLE_t lambda_, DOUBLE_t C_max):
         """
         Parameters
         ----------
@@ -102,13 +102,14 @@ cdef class Splitter:
         self.min_weight_leaf = min_weight_leaf
         self.random_state = random_state
 
-        # print(f"{len(preference)}")
-        self.preference = <DOUBLE_t *>malloc(len(preference) * sizeof(DOUBLE_t))
+        self.preference = safe_realloc(&self.preference, len(preference) * sizeof(DOUBLE_t))
         for i, x in enumerate(preference):
             self.preference[i] = x
-            # print(self.preference[i], end=",")
+
         self.lambda_ = lambda_
-        # print(f"lambda_={self.lambda_}")
+        self.C_max = C_max
+        self.used_features = NULL
+        self.candidate_features = NULL
 
     def __dealloc__(self):
         """Destructor."""
@@ -118,6 +119,8 @@ cdef class Splitter:
         free(self.constant_features)
         free(self.feature_values)
         free(self.preference)
+        free(self.used_features)
+        free(self.candidate_features)
 
     def __getstate__(self):
         return {}
@@ -182,9 +185,13 @@ cdef class Splitter:
 
         cdef SIZE_t n_features = X.shape[1]
         cdef SIZE_t* features = safe_realloc(&self.features, n_features)
+        cdef SIZE_t* used_features = safe_realloc(&self.used_features, n_features)
+        cdef SIZE_t* candidate_features = safe_realloc(&self.candidate_features, n_features)
 
         for i in range(n_features):
             features[i] = i
+            used_features[i] = 0
+            candidate_features[i] = 0
 
         self.n_features = n_features
 
@@ -260,7 +267,7 @@ cdef class BaseDenseSplitter(Splitter):
 
     def __cinit__(self, Criterion criterion, SIZE_t max_features,
                   SIZE_t min_samples_leaf, double min_weight_leaf,
-                  object random_state, np.ndarray preference, DOUBLE_t lambda_):
+                  object random_state, np.ndarray preference, DOUBLE_t lambda_, DOUBLE_t C_max):
 
         self.X_idx_sorted_ptr = NULL
         self.X_idx_sorted_stride = 0
@@ -292,6 +299,14 @@ cdef class BestSplitter(BaseDenseSplitter):
                                self.min_samples_leaf,
                                self.min_weight_leaf,
                                self.random_state), self.__getstate__())
+
+    cdef double sum_of_cost(self) nogil except -1:
+        cdef double sum_ = 0
+        for i in range(self.n_features):
+            # sum_ += self.preference[i] if self.used_features[i] == 1 else 0
+            sum_ += 1 if self.used_features[i] == 1 else 0
+        return sum_
+
 
     cdef int node_split(self, double impurity, SplitRecord* split,
                         SIZE_t* n_constant_features) nogil except -1:
@@ -342,6 +357,8 @@ cdef class BestSplitter(BaseDenseSplitter):
         cdef SIZE_t partition_end
 
         cdef DOUBLE_t loss
+        cdef SIZE_t n_candidate_features
+        cdef double sum_of_costs_
 
         _init_split(&best, end)
 
@@ -373,9 +390,23 @@ cdef class BestSplitter(BaseDenseSplitter):
             # - [f_i:n_features[ holds features that have been drawn
             #   and aren't constant.
 
-            # Draw a feature at random
-            f_j = rand_int(n_drawn_constants, f_i - n_found_constants,
-                           random_state)
+            sum_of_costs_= self.sum_of_cost()
+            printf("sum of cost = %f, C_max = %f\n", sum_of_costs_, self.C_max)
+            if sum_of_costs_ < self.C_max:
+                # Draw a feature at random
+                f_j = rand_int(n_drawn_constants, f_i - n_found_constants,
+                               random_state)
+            else:
+                n_candidate_features = 0
+                for i in range(n_drawn_constants, f_i - n_found_constants):
+                    # Only use used feature
+                    if self.used_features[features[i]] == 1:
+                        self.candidate_features[n_candidate_features] = i
+                        n_candidate_features += 1
+                if n_candidate_features == 0:
+                    break
+                f_j = self.candidate_features[rand_int(0, n_candidate_features, random_state)]
+
 
             if f_j < n_known_constants:
                 # f_j in the interval [n_drawn_constants, n_known_constants[
@@ -439,7 +470,6 @@ cdef class BestSplitter(BaseDenseSplitter):
                                 continue
 
                             loss = self.lambda_ * self.preference[current.feature]
-                            # printf("loss=%f\n", loss)
                             current_proxy_improvement = self.criterion.proxy_impurity_improvement() - loss
 
                             if current_proxy_improvement > best_proxy_improvement:
@@ -453,6 +483,8 @@ cdef class BestSplitter(BaseDenseSplitter):
                                     current.threshold = Xf[p - 1]
 
                                 best = current  # copy
+
+        self.used_features[best.feature] = 1
 
         # Reorganize into samples[start:best.pos] + samples[best.pos:end]
         if best.pos < end:

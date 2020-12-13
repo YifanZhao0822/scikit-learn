@@ -99,8 +99,9 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
                  class_weight=None,
                  presort='deprecated',
                  ccp_alpha=0.0,
-                 preference=None,
-                 lambda_=None):
+                 preference,
+                 lambda_,
+                 C_max):
         self.criterion = criterion
         self.splitter = splitter
         self.max_depth = max_depth
@@ -117,6 +118,7 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
         self.ccp_alpha = ccp_alpha
         self.preference = preference
         self.lambda_ = lambda_
+        self.C_max = C_max
 
     def get_depth(self):
         """Return the depth of the decision tree.
@@ -350,7 +352,8 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
                                                 min_weight_leaf,
                                                 random_state,
                                                 self.preference,
-                                                self.lambda_)
+                                                self.lambda_,
+                                                self.C_max)
 
         if is_classifier(self):
             self.tree_ = Tree(self.n_features_,
@@ -840,7 +843,8 @@ class DecisionTreeClassifier(ClassifierMixin, BaseDecisionTree):
                  presort='deprecated',
                  ccp_alpha=0.0,
                  preference=None,
-                 lambda_=None):
+                 lambda_=None,
+                 C_max=np.inf):
         super().__init__(
             criterion=criterion,
             splitter=splitter,
@@ -857,7 +861,9 @@ class DecisionTreeClassifier(ClassifierMixin, BaseDecisionTree):
             presort=presort,
             ccp_alpha=ccp_alpha,
             preference=preference,
-            lambda_=lambda_)
+            lambda_=lambda_,
+            C_max=C_max
+        )
 
     def fit(self, X, y, sample_weight=None, check_input=True,
             X_idx_sorted=None):

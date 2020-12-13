@@ -62,6 +62,10 @@ cdef class Splitter:
 
     cdef DOUBLE_t* preference
     cdef DOUBLE_t lambda_
+    cdef DOUBLE_t C_max
+    cdef SIZE_t* used_features
+    cdef SIZE_t* candidate_features
+
 
     # The samples vector `samples` is maintained by the Splitter object such
     # that the samples contained in a node are contiguous. With this setting,
