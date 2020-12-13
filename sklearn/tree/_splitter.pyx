@@ -360,6 +360,8 @@ cdef class BestSplitter(BaseDenseSplitter):
         cdef SIZE_t n_candidate_features
         cdef double sum_of_costs_
 
+        cdef bint flag = False
+
         _init_split(&best, end)
 
         # Sample up to max_features without replacement using a
@@ -404,7 +406,13 @@ cdef class BestSplitter(BaseDenseSplitter):
                         self.candidate_features[n_candidate_features] = i
                         n_candidate_features += 1
                 if n_candidate_features == 0:
+                    flag = True
                     break
+
+                # printf("# Candidate features: %d\n", n_candidate_features)
+                # for idx in range(self.n_features):
+                #     printf(" %d,", self.used_features[idx])
+                # printf("\n")
                 f_j = self.candidate_features[rand_int(0, n_candidate_features, random_state)]
 
 
@@ -484,7 +492,14 @@ cdef class BestSplitter(BaseDenseSplitter):
 
                                 best = current  # copy
 
-        self.used_features[best.feature] = 1
+        if not flag and self.sum_of_cost() - self.C_max < 0.00001:
+            self.used_features[best.feature] = 1
+
+        if flag:
+            best.pos = end
+
+        if self.sum_of_cost() - 1 > 0.000001:
+            printf("Terminating\n")
 
         # Reorganize into samples[start:best.pos] + samples[best.pos:end]
         if best.pos < end:
