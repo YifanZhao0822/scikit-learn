@@ -185,12 +185,12 @@ cdef class Splitter:
 
         cdef SIZE_t n_features = X.shape[1]
         cdef SIZE_t* features = safe_realloc(&self.features, n_features)
-        cdef SIZE_t* used_features = safe_realloc(&self.used_features, n_features)
+        cdef bint* used_features = safe_realloc(&self.used_features, n_features)
         cdef SIZE_t* candidate_features = safe_realloc(&self.candidate_features, n_features)
 
         for i in range(n_features):
             features[i] = i
-            used_features[i] = 0
+            used_features[i] = False
             candidate_features[i] = 0
 
         self.n_features = n_features
@@ -304,7 +304,7 @@ cdef class BestSplitter(BaseDenseSplitter):
         cdef double sum_ = 0
         for i in range(self.n_features):
             # sum_ += self.preference[i] if self.used_features[i] == 1 else 0
-            sum_ += 1 if self.used_features[i] == 1 else 0
+            sum_ += 1 if self.used_features[i] else 0
         return sum_
 
 
@@ -360,8 +360,6 @@ cdef class BestSplitter(BaseDenseSplitter):
         cdef SIZE_t n_candidate_features
         cdef double sum_of_costs_
 
-        cdef bint flag = False
-
         _init_split(&best, end)
 
         # Sample up to max_features without replacement using a
@@ -373,8 +371,7 @@ cdef class BestSplitter(BaseDenseSplitter):
         # for good splitting) by ancestor nodes and save the information on
         # newly discovered constant features to spare computation on descendant
         # nodes.
-        while (f_i > n_total_constants and  # Stop early if remaining features
-                                            # are constant
+        while (f_i > n_total_constants and  # Stop early if remaining features are constant
                 (n_visited_features < max_features or
                  # At least one drawn features must be non constant
                  n_visited_features <= n_found_constants + n_drawn_constants)):
@@ -394,26 +391,10 @@ cdef class BestSplitter(BaseDenseSplitter):
 
             sum_of_costs_= self.sum_of_cost()
             printf("sum of cost = %f, C_max = %f\n", sum_of_costs_, self.C_max)
-            if sum_of_costs_ < self.C_max:
-                # Draw a feature at random
-                f_j = rand_int(n_drawn_constants, f_i - n_found_constants,
-                               random_state)
-            else:
-                n_candidate_features = 0
-                for i in range(n_drawn_constants, f_i - n_found_constants):
-                    # Only use used feature
-                    if self.used_features[features[i]] == 1:
-                        self.candidate_features[n_candidate_features] = i
-                        n_candidate_features += 1
-                if n_candidate_features == 0:
-                    flag = True
-                    break
 
-                # printf("# Candidate features: %d\n", n_candidate_features)
-                # for idx in range(self.n_features):
-                #     printf(" %d,", self.used_features[idx])
-                # printf("\n")
-                f_j = self.candidate_features[rand_int(0, n_candidate_features, random_state)]
+            # Draw a feature at random
+            f_j = rand_int(n_drawn_constants, f_i - n_found_constants,
+                           random_state)
 
 
             if f_j < n_known_constants:
@@ -446,6 +427,10 @@ cdef class BestSplitter(BaseDenseSplitter):
                 else:
                     f_i -= 1
                     features[f_i], features[f_j] = features[f_j], features[f_i]
+
+                    if not self.used_features[current.feature] \
+                            and sum_of_costs_ + self.preference[current.feature] >= self.C_max:
+                            continue
 
                     # Evaluate all splits
                     self.criterion.reset()
@@ -492,17 +477,10 @@ cdef class BestSplitter(BaseDenseSplitter):
 
                                 best = current  # copy
 
-        if not flag and self.sum_of_cost() - self.C_max < 0.00001:
-            self.used_features[best.feature] = 1
-
-        if flag:
-            best.pos = end
-
-        if self.sum_of_cost() - 1 > 0.000001:
-            printf("Terminating\n")
-
         # Reorganize into samples[start:best.pos] + samples[best.pos:end]
         if best.pos < end:
+            self.used_features[best.feature] = True
+
             partition_end = end
             p = start
 
