@@ -64,7 +64,6 @@ cdef class Splitter:
     cdef DOUBLE_t lambda_
     cdef DOUBLE_t C_max
     cdef bint* used_features
-    cdef SIZE_t* candidate_features
 
 
     # The samples vector `samples` is maintained by the Splitter object such

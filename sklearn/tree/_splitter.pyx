@@ -109,7 +109,6 @@ cdef class Splitter:
         self.lambda_ = lambda_
         self.C_max = C_max
         self.used_features = NULL
-        self.candidate_features = NULL
 
     def __dealloc__(self):
         """Destructor."""
@@ -120,7 +119,6 @@ cdef class Splitter:
         free(self.feature_values)
         free(self.preference)
         free(self.used_features)
-        free(self.candidate_features)
 
     def __getstate__(self):
         return {}
@@ -186,12 +184,10 @@ cdef class Splitter:
         cdef SIZE_t n_features = X.shape[1]
         cdef SIZE_t* features = safe_realloc(&self.features, n_features)
         cdef bint* used_features = safe_realloc(&self.used_features, n_features)
-        cdef SIZE_t* candidate_features = safe_realloc(&self.candidate_features, n_features)
 
         for i in range(n_features):
             features[i] = i
             used_features[i] = False
-            candidate_features[i] = 0
 
         self.n_features = n_features
 
@@ -357,7 +353,6 @@ cdef class BestSplitter(BaseDenseSplitter):
         cdef SIZE_t partition_end
 
         cdef DOUBLE_t loss
-        cdef SIZE_t n_candidate_features
         cdef double sum_of_costs_
 
         _init_split(&best, end)
@@ -428,9 +423,8 @@ cdef class BestSplitter(BaseDenseSplitter):
                     f_i -= 1
                     features[f_i], features[f_j] = features[f_j], features[f_i]
 
-                    if not self.used_features[current.feature] \
-                            and sum_of_costs_ + self.preference[current.feature] >= self.C_max:
-                            continue
+                    if not self.used_features[current.feature] and sum_of_costs_ + 1 >= self.C_max:
+                        continue
 
                     # Evaluate all splits
                     self.criterion.reset()
