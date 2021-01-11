@@ -352,7 +352,9 @@ cdef class BestSplitter(BaseDenseSplitter):
         cdef DTYPE_t current_feature_value
         cdef SIZE_t partition_end
 
+        # Loss of impunity improvement due to higher cost (lower preference)
         cdef DOUBLE_t loss
+        # Sum of costs before calculating next node to be split
         cdef double sum_of_costs_
 
         _init_split(&best, end)
@@ -423,6 +425,7 @@ cdef class BestSplitter(BaseDenseSplitter):
                     f_i -= 1
                     features[f_i], features[f_j] = features[f_j], features[f_i]
 
+                    # Skip examining current feature if it is not already used AND the limit of features amount is reached.
                     if not self.used_features[current.feature] and sum_of_costs_ + 1 >= self.C_max:
                         continue
 
@@ -456,6 +459,7 @@ cdef class BestSplitter(BaseDenseSplitter):
                                     (self.criterion.weighted_n_right < min_weight_leaf)):
                                 continue
 
+                            # Regularize using current feature's cost
                             loss = self.lambda_ * self.preference[current.feature]
                             current_proxy_improvement = self.criterion.proxy_impurity_improvement() - loss
 

@@ -60,10 +60,10 @@ cdef class Splitter:
     cdef const DOUBLE_t[:, ::1] y
     cdef DOUBLE_t* sample_weight
 
-    cdef DOUBLE_t* preference
-    cdef DOUBLE_t lambda_
-    cdef DOUBLE_t C_max
-    cdef bint* used_features
+    cdef DOUBLE_t* preference            # User preferences (cost); smaller value means higher preference (lower cost)
+    cdef DOUBLE_t lambda_                # Regularization parameter for user preferences
+    cdef DOUBLE_t C_max                  # Maximum amount of features to be used in splitting nodes
+    cdef bint* used_features             # Array to record used features in splitting nodes
 
 
     # The samples vector `samples` is maintained by the Splitter object such
